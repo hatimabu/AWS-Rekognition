@@ -1,7 +1,5 @@
 This project implements a facial recognition pipeline for a building's security system. It analyzes images captured by a front-door camera, processing up to 500 employee scans daily. Using Amazon Rekognition, the system detects faces in images uploaded to S3. If a face is recognized, the results are stored in DynamoDB, and a notification is sent via SNS to authorize security to unlock the door, allowing employees to enter the building and begin work.
 
-**Learning Component**: This project includes a comprehensive SQL database (`rekognition_database.sql`) designed for students to practice essential SQL concepts including CRUD operations, JOINs, aggregations, and subqueries using real-world image analysis data structures.
-
 ---
 
 ![alt text](image.png)
