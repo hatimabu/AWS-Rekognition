@@ -1,18 +1,40 @@
 import boto3
 import json
 import os
+import time
 from decimal import Decimal
 
 rekognition = boto3.client('rekognition', region_name='us-east-2')
 dynamodb = boto3.resource('dynamodb', region_name='us-east-2')
 sns = boto3.client('sns', region_name='us-east-2')
+cloudwatch = boto3.client('cloudwatch', region_name='us-east-2')
 
 # Get configuration from environment variables (set during Lambda deployment)
 DYNAMO_TABLE = os.environ.get('DYNAMO_TABLE', 'FaceMetadata')
 SNS_TOPIC_ARN = os.environ.get('SNS_TOPIC_ARN', 'arn:aws:sns:us-east-2:094092120892:FaceDetectedTopic')
 REKOGNITION_COLLECTION = os.environ.get('REKOGNITION_COLLECTION', 'employeeFaces')
 
+def put_custom_metric(metric_name, value, unit='Count'):
+    """Send custom metric to CloudWatch"""
+    try:
+        cloudwatch.put_metric_data(
+            Namespace='RekognitionPipeline',
+            MetricData=[{
+                'MetricName': metric_name,
+                'Value': value,
+                'Unit': unit,
+                'Timestamp': time.time(),
+                'Dimensions': [
+                    {'Name': 'FunctionName', 'Value': 'facial-recognition'}
+                ]
+            }]
+        )
+    except Exception as e:
+        print(f"Failed to send metric {metric_name}: {str(e)}")
+
 def lambda_handler(event, context):
+    start_time = time.time()
+
     # Extract bucket and key early for error handling
     bucket = 'Unknown'
     key = 'Unknown'
@@ -21,6 +43,9 @@ def lambda_handler(event, context):
         bucket = record['s3']['bucket']['name']
         key = record['s3']['object']['key']
         print(f"Processing image: {key} from bucket: {bucket}")
+
+        # Track image processing start
+        put_custom_metric('ImagesProcessed', 1)
 
         # Step 1: Detect faces
         response = rekognition.detect_faces(
@@ -33,6 +58,8 @@ def lambda_handler(event, context):
         # Handle case when no face is detected
         if not face_details:
             print("No face detected in image.")
+            # Track face detection failure
+            put_custom_metric('FaceDetectionFailed', 1)
             # Send notification even when no face is detected
             message = f"""Image Processing Result
 
@@ -55,6 +82,9 @@ Access should be denied."""
         face = face_details[0]
         print("Face detected. Processing...")
 
+        # Track successful face detection
+        put_custom_metric('FaceDetected', 1)
+
         # Step 2: Search for face match in collection
         match_response = rekognition.search_faces_by_image(
             CollectionId=REKOGNITION_COLLECTION,
@@ -67,7 +97,14 @@ Access should be denied."""
         is_matched = len(matches) > 0
         match_info = matches[0]['Face']['ExternalImageId'] if is_matched else 'No match found'
         match_confidence = matches[0]['Similarity'] if is_matched else 0
-        
+
+        # Track match results
+        if is_matched:
+            put_custom_metric('MatchFound', 1)
+            put_custom_metric('MatchConfidence', match_confidence, 'Percent')
+        else:
+            put_custom_metric('MatchNotFound', 1)
+
         print(f"Match result: {match_info} (Matched: {is_matched})")
 
         # Step 3: Write to DynamoDB with match status
@@ -140,6 +177,10 @@ Security should be notified immediately."""
         )
         print(f"SNS notification sent. Status: {'MATCHED' if is_matched else 'UNMATCHED'}")
 
+        # Track processing time
+        processing_time = (time.time() - start_time) * 1000  # Convert to milliseconds
+        put_custom_metric('ProcessingTime', processing_time, 'Milliseconds')
+
         return {
             'statusCode': 200,
             'body': json.dumps({
@@ -153,7 +194,10 @@ Security should be notified immediately."""
     except Exception as e:
         error_message = str(e)
         print(f"Error: {error_message}")
-        
+
+        # Track processing errors
+        put_custom_metric('ProcessingErrors', 1)
+
         # Send error notification via SNS
         try:
             error_notification = f"""❌ ERROR - Face Recognition Processing Failed
