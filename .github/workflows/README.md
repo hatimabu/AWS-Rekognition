@@ -1,6 +1,6 @@
 # GitHub Actions Workflow Setup
 
-This workflow allows you to deploy your AWS infrastructure pipeline from GitHub Actions.
+This workflow allows you to deploy/destroy your AWS infrastructure pipeline from GitHub Actions.
 
 ## Prerequisites
 
