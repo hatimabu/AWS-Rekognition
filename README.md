@@ -1,3 +1,8 @@
+[![Deploy AWS Infrastructure](https://github.com/hatimabu/Rekognition/workflows/Deploy%20AWS%20Infrastructure/badge.svg)](https://github.com/hatimabu/Rekognition/actions/workflows/deploy-infrastructure.yml)
+[![Destroy AWS Infrastructure](https://github.com/hatimabu/Rekognition/workflows/Destroy%20AWS%20Infrastructure/badge.svg)](https://github.com/hatimabu/Rekognition/actions/workflows/destroy-infrastructure.yml)
+
+---
+
 This project implements a facial recognition pipeline for a building's security system. It analyzes images captured by a front-door camera, processing up to 500 employee scans daily. Using Amazon Rekognition, the system detects faces in images uploaded to S3. If a face is recognized, the results are stored in DynamoDB, and a notification is sent via SNS to authorize security to unlock the door, allowing employees to enter the building and begin work.
 
 ---
