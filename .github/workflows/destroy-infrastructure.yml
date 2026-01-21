@@ -1,0 +1,56 @@
+name: Destroy AWS Infrastructure
+
+on:
+  workflow_dispatch:  # Allows manual triggering from GitHub Actions UI
+  # Uncomment the line below if you want to trigger on pull requests
+  # pull_request:
+  #   branches:
+  #     - main
+  #   types: [closed]  # Only trigger when PR is closed/merged
+
+jobs:
+  destroy:
+    name: Destroy Infrastructure Pipeline
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-2
+
+      - name: Run destroy infrastructure pipeline
+        working-directory: ./rekognition
+        continue-on-error: false
+        run: |
+          echo "Starting infrastructure destruction..."
+          echo "⚠️  WARNING: This will permanently delete all AWS resources!"
+          python destroy_pipeline.py
+          echo "Destruction pipeline completed successfully!"
+
+      - name: Pipeline summary
+        if: always()
+        run: |
+          echo "## Infrastructure Destruction Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- Destruction pipeline executed at $(date)" >> $GITHUB_STEP_SUMMARY
+          echo "- Check the logs above for detailed output" >> $GITHUB_STEP_SUMMARY
+          echo "- All AWS resources should be deleted and removed" >> $GITHUB_STEP_SUMMARY
+          echo "- ⚠️  Note: Some resources may take a few minutes to be fully removed from AWS" >> $GITHUB_STEP_SUMMARY
